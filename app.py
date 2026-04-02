@@ -8,13 +8,57 @@ st.set_page_config(
 )
 
 # -----------------------------
-# Streamlit Session State
+# Session State
 # -----------------------------
 if "game_started" not in st.session_state:
     st.session_state.game_started = False
 
 if "game_instance" not in st.session_state:
     st.session_state.game_instance = 0
+
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = "Medium"
+
+if "selected_car" not in st.session_state:
+    st.session_state.selected_car = "Thunder GT"
+
+# -----------------------------
+# Car Data
+# -----------------------------
+car_options = {
+    "Thunder GT": {
+        "color": "#22c55e",
+        "max_speed": 9.2,
+        "accel": 0.21,
+        "brake": 0.26,
+        "handling": 5.8,
+        "label": "Balanced performance"
+    },
+    "Blaze X": {
+        "color": "#ef4444",
+        "max_speed": 9.6,
+        "accel": 0.23,
+        "brake": 0.25,
+        "handling": 5.4,
+        "label": "Fast top speed"
+    },
+    "Vortex R": {
+        "color": "#3b82f6",
+        "max_speed": 8.9,
+        "accel": 0.20,
+        "brake": 0.28,
+        "handling": 6.2,
+        "label": "Best handling"
+    },
+    "Titan ZX": {
+        "color": "#f59e0b",
+        "max_speed": 8.6,
+        "accel": 0.18,
+        "brake": 0.30,
+        "handling": 6.0,
+        "label": "Strong control"
+    }
+}
 
 # -----------------------------
 # Actions
@@ -61,6 +105,7 @@ html, body, [class*="css"] {
     border-radius: 18px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     margin-bottom: 14px;
+    min-height: 150px;
 }
 
 .info-title {
@@ -100,31 +145,52 @@ html, body, [class*="css"] {
 # -----------------------------
 st.markdown('<div class="main-title">🏎️ Turbo Track Legends</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="sub-title">Drive with arrow keys, race against AI cars, and avoid every collision.</div>',
+    '<div class="sub-title">Choose your car, select a level, avoid traffic, and complete all laps.</div>',
     unsafe_allow_html=True
 )
 
 # -----------------------------
-# Controls
+# Top Controls
 # -----------------------------
-btn1, btn2, btn3 = st.columns(3)
+top1, top2, top3 = st.columns([2, 1, 1])
 
-with btn1:
-    if st.button("▶️ Start Game", use_container_width=True):
-        start_game()
+with top1:
+    btn1, btn2, btn3 = st.columns(3)
 
-with btn2:
-    if st.button("⏹️ Stop Game", use_container_width=True):
-        stop_game()
+    with btn1:
+        if st.button("▶️ Start Game", use_container_width=True):
+            start_game()
 
-with btn3:
-    if st.button("🔄 Restart Game", use_container_width=True):
-        restart_game()
+    with btn2:
+        if st.button("⏹️ Stop Game", use_container_width=True):
+            stop_game()
+
+    with btn3:
+        if st.button("🔄 Restart Game", use_container_width=True):
+            restart_game()
+
+with top2:
+    difficulty = st.selectbox(
+        "Select Level",
+        ["Easy", "Medium", "Hard"],
+        index=["Easy", "Medium", "Hard"].index(st.session_state.difficulty)
+    )
+    st.session_state.difficulty = difficulty
+
+with top3:
+    selected_car = st.selectbox(
+        "Choose Car",
+        list(car_options.keys()),
+        index=list(car_options.keys()).index(st.session_state.selected_car)
+    )
+    st.session_state.selected_car = selected_car
+
+selected_car_data = car_options[selected_car]
 
 # -----------------------------
-# Info cards
+# Info Cards
 # -----------------------------
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown("""
@@ -140,25 +206,40 @@ with c1:
     """, unsafe_allow_html=True)
 
 with c2:
-    st.markdown("""
+    st.markdown(f"""
     <div class="info-box">
-        <div class="info-title">🏁 Rules</div>
+        <div class="info-title">🚦 Level</div>
         <div class="info-text">
-            Touching any AI car = Game Over<br>
-            Touching traffic car = Game Over<br>
-            Complete all laps to finish race
+            Selected level: <b>{difficulty}</b><br>
+            Easy = fewer cars<br>
+            Medium = balanced traffic<br>
+            Hard = fast crowded traffic
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 with c3:
+    st.markdown(f"""
+    <div class="info-box">
+        <div class="info-title">🚘 Selected Car</div>
+        <div class="info-text">
+            <b>{selected_car}</b><br>
+            Style: {selected_car_data["label"]}<br>
+            Max Speed: {selected_car_data["max_speed"]}<br>
+            Handling: {selected_car_data["handling"]}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with c4:
     status_text = "Running" if st.session_state.game_started else "Stopped"
     st.markdown(f"""
     <div class="info-box">
         <div class="info-title">📡 Game Status</div>
         <div class="info-text">
             Current state: <b>{status_text}</b><br>
-            Click inside game area before using keyboard
+            Traffic hit = <b>Game Over</b><br>
+            Finish all laps to win
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -169,7 +250,7 @@ st.markdown(
 )
 
 # -----------------------------
-# Game HTML / JS
+# Game HTML
 # -----------------------------
 game_html = f"""
 <!DOCTYPE html>
@@ -221,7 +302,31 @@ game_html = f"""
 
 <script>
 const GAME_STARTED = {str(st.session_state.game_started).lower()};
-const GAME_INSTANCE = {st.session_state.game_instance};
+const DIFFICULTY = "{difficulty}";
+const SELECTED_CAR = {selected_car_data};
+
+const levelSettings = {{
+    Easy: {{
+        trafficCount: 6,
+        trafficMinSpeed: 2.2,
+        trafficMaxSpeed: 3.5,
+        lapsToFinish: 2
+    }},
+    Medium: {{
+        trafficCount: 9,
+        trafficMinSpeed: 3.0,
+        trafficMaxSpeed: 4.5,
+        lapsToFinish: 3
+    }},
+    Hard: {{
+        trafficCount: 13,
+        trafficMinSpeed: 3.8,
+        trafficMaxSpeed: 5.8,
+        lapsToFinish: 4
+    }}
+}};
+
+const settings = levelSettings[DIFFICULTY];
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -236,8 +341,8 @@ const road = {{
     laneWidth: 560 / 4
 }};
 
-const lapsToFinish = 3;
-const finishDistance = 7500;
+const lapsToFinish = settings.lapsToFinish;
+const finishDistance = lapsToFinish * 2600;
 
 let gameOver = false;
 let gameFinished = false;
@@ -258,55 +363,15 @@ const player = {{
     w: 44,
     h: 84,
     speed: 0,
-    maxSpeed: 9.0,
-    accel: 0.20,
-    brake: 0.25,
+    maxSpeed: SELECTED_CAR.max_speed,
+    accel: SELECTED_CAR.accel,
+    brake: SELECTED_CAR.brake,
     friction: 0.06,
-    color: "#22c55e",
+    handling: SELECTED_CAR.handling,
+    color: SELECTED_CAR.color,
     distance: 0,
-    lap: 1,
-    finished: false,
-    rank: 1
+    lap: 1
 }};
-
-const aiCars = [
-    {{
-        name: "Blaze AI",
-        x: road.x + road.laneWidth * 0.5 - 22,
-        y: H - 250,
-        w: 44,
-        h: 84,
-        speed: 5.4,
-        color: "#ef4444",
-        distance: 0,
-        lap: 1,
-        finished: false
-    }},
-    {{
-        name: "Vortex AI",
-        x: road.x + road.laneWidth * 2.5 - 22,
-        y: H - 360,
-        w: 44,
-        h: 84,
-        speed: 5.7,
-        color: "#3b82f6",
-        distance: 0,
-        lap: 1,
-        finished: false
-    }},
-    {{
-        name: "Titan AI",
-        x: road.x + road.laneWidth * 3.5 - 22,
-        y: H - 470,
-        w: 44,
-        h: 84,
-        speed: 5.2,
-        color: "#f59e0b",
-        distance: 0,
-        lap: 1,
-        finished: false
-    }}
-];
 
 const traffic = [];
 
@@ -314,15 +379,15 @@ function createTrafficCar() {{
     const lane = Math.floor(Math.random() * road.laneCount);
     return {{
         x: road.x + lane * road.laneWidth + road.laneWidth / 2 - 20,
-        y: -120 - Math.random() * 1400,
+        y: -120 - Math.random() * 1800,
         w: 40,
         h: 74,
-        speed: 3 + Math.random() * 2.2,
-        color: ["#a855f7", "#06b6d4", "#e11d48", "#84cc16", "#f97316"][Math.floor(Math.random() * 5)]
+        speed: settings.trafficMinSpeed + Math.random() * (settings.trafficMaxSpeed - settings.trafficMinSpeed),
+        color: ["#a855f7", "#06b6d4", "#e11d48", "#84cc16", "#f97316", "#f43f5e"][Math.floor(Math.random() * 6)]
     }};
 }}
 
-for (let i = 0; i < 9; i++) {{
+for (let i = 0; i < settings.trafficCount; i++) {{
     traffic.push(createTrafficCar());
 }}
 
@@ -349,22 +414,21 @@ function rectsCollide(a, b) {{
     );
 }}
 
-function getStandings() {{
-    return [
-        {{name: "You", dist: player.distance}},
-        ...aiCars.map(c => ({{name: c.name, dist: c.distance}}))
-    ].sort((a, b) => b.dist - a.dist);
-}}
-
-function updatePlayerRank() {{
-    const standings = getStandings();
-    player.rank = standings.findIndex(s => s.name === "You") + 1;
-}}
-
 function drawBackground() {{
     ctx.fillStyle = "#14532d";
     ctx.fillRect(0, 0, road.x, H);
     ctx.fillRect(road.x + road.width, 0, W - (road.x + road.width), H);
+
+    for (let i = 0; i < 10; i++) {{
+        ctx.fillStyle = "#166534";
+        ctx.beginPath();
+        ctx.arc(60 + i * 14, 70 + i * 55, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(W - 60 - i * 14, 95 + i * 52, 12, 0, Math.PI * 2);
+        ctx.fill();
+    }}
 }}
 
 function drawRoad() {{
@@ -418,44 +482,44 @@ function drawTraffic() {{
 
 function drawHUD() {{
     ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
-    ctx.fillRect(18, 18, 300, 140);
+    ctx.fillRect(18, 18, 330, 190);
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.strokeRect(18, 18, 300, 140);
+    ctx.strokeRect(18, 18, 330, 190);
 
     ctx.fillStyle = "white";
     ctx.font = "bold 23px Arial";
     ctx.fillText("PLAYER HUD", 32, 46);
 
     ctx.font = "18px Arial";
-    ctx.fillText("Speed: " + player.speed.toFixed(1), 32, 78);
-    ctx.fillText("Lap: " + player.lap + " / " + lapsToFinish, 32, 106);
-    ctx.fillText("Rank: #" + player.rank, 32, 134);
-
-    const standings = getStandings();
-
-    ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
-    ctx.fillRect(W - 260, 18, 230, 150);
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.strokeRect(W - 260, 18, 230, 150);
-
-    ctx.fillStyle = "white";
-    ctx.font = "bold 22px Arial";
-    ctx.fillText("STANDINGS", W - 243, 46);
-
-    ctx.font = "17px Arial";
-    standings.forEach((s, i) => {{
-        ctx.fillText((i + 1) + ". " + s.name, W - 243, 76 + i * 25);
-    }});
+    ctx.fillText("Car: " + "{selected_car}", 32, 78);
+    ctx.fillText("Speed: " + player.speed.toFixed(1), 32, 106);
+    ctx.fillText("Lap: " + player.lap + " / " + lapsToFinish, 32, 134);
+    ctx.fillText("Level: " + DIFFICULTY, 32, 162);
+    ctx.fillText("Traffic Cars: " + settings.trafficCount, 32, 190);
 
     ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
-    ctx.fillRect(18, H - 72, 380, 48);
+    ctx.fillRect(W - 280, 18, 250, 125);
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.strokeRect(18, H - 72, 380, 48);
+    ctx.strokeRect(W - 280, 18, 250, 125);
 
     ctx.fillStyle = "white";
+    ctx.font = "bold 21px Arial";
+    ctx.fillText("RACE STATUS", W - 260, 46);
+
     ctx.font = "17px Arial";
     const progress = Math.min(100, (player.distance / finishDistance) * 100).toFixed(0);
-    ctx.fillText("Race Progress: " + progress + "%", 34, H - 41);
+    ctx.fillText("Progress: " + progress + "%", W - 260, 78);
+    ctx.fillText("Goal: Complete all laps", W - 260, 106);
+    ctx.fillText("Crash with traffic = Lose", W - 260, 134);
+
+    ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+    ctx.fillRect(18, H - 72, 440, 48);
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.strokeRect(18, H - 72, 440, 48);
+
+    ctx.fillStyle = "white";
+    ctx.font = "17px Arial";
+    ctx.fillText("Use arrow keys to survive traffic and finish the track.", 34, H - 41);
 }}
 
 function updatePlayer() {{
@@ -471,8 +535,8 @@ function updatePlayer() {{
     if (player.speed < 0) player.speed = 0;
     if (player.speed > player.maxSpeed) player.speed = player.maxSpeed;
 
-    if (keys.ArrowLeft) player.x -= 5.5;
-    if (keys.ArrowRight) player.x += 5.5;
+    if (keys.ArrowLeft) player.x -= player.handling;
+    if (keys.ArrowRight) player.x += player.handling;
 
     if (player.x < road.x + 8) player.x = road.x + 8;
     if (player.x + player.w > road.x + road.width - 8) {{
@@ -483,41 +547,18 @@ function updatePlayer() {{
     player.lap = Math.min(lapsToFinish, Math.floor(player.distance / (finishDistance / lapsToFinish)) + 1);
 
     if (player.distance >= finishDistance) {{
-        player.finished = true;
         gameFinished = true;
         gameOver = true;
-        updatePlayerRank();
-        playerWon = player.rank === 1;
+        stopped = true;
+        playerWon = true;
     }}
-}}
-
-function updateAI() {{
-    aiCars.forEach((car) => {{
-        if (!car.finished) {{
-            const wobble = (Math.random() - 0.5) * 1.0;
-            car.x += wobble;
-
-            const minX = road.x + 8;
-            const maxX = road.x + road.width - car.w - 8;
-
-            if (car.x < minX) car.x = minX;
-            if (car.x > maxX) car.x = maxX;
-
-            car.distance += car.speed + (Math.random() - 0.5) * 0.16;
-            car.lap = Math.min(lapsToFinish, Math.floor(car.distance / (finishDistance / lapsToFinish)) + 1);
-
-            if (car.distance >= finishDistance) {{
-                car.finished = true;
-            }}
-        }}
-    }});
 }}
 
 function updateTraffic() {{
     roadScroll += player.speed * 1.8;
 
     traffic.forEach((car) => {{
-        car.y += car.speed + player.speed * 0.48;
+        car.y += car.speed + player.speed * 0.52;
 
         if (car.y > H + 120) {{
             const newCar = createTrafficCar();
@@ -532,16 +573,6 @@ function updateTraffic() {{
 }}
 
 function checkCollisions() {{
-    for (let i = 0; i < aiCars.length; i++) {{
-        if (rectsCollide(player, aiCars[i])) {{
-            gameOver = true;
-            gameFinished = false;
-            playerWon = false;
-            stopped = true;
-            return;
-        }}
-    }}
-
     for (let i = 0; i < traffic.length; i++) {{
         if (rectsCollide(player, traffic[i])) {{
             gameOver = true;
@@ -557,7 +588,7 @@ function drawCenteredMessage(title, subtitle, color1, color2) {{
     ctx.fillStyle = "rgba(0,0,0,0.70)";
     ctx.fillRect(0, 0, W, H);
 
-    const boxW = 520;
+    const boxW = 540;
     const boxH = 220;
     const boxX = (W - boxW) / 2;
     const boxY = (H - boxH) / 2;
@@ -575,7 +606,7 @@ function drawCenteredMessage(title, subtitle, color1, color2) {{
 
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
-    ctx.font = "bold 44px Arial";
+    ctx.font = "bold 42px Arial";
     ctx.fillText(title, W / 2, boxY + 82);
 
     ctx.font = "24px Arial";
@@ -589,16 +620,14 @@ function drawCenteredMessage(title, subtitle, color1, color2) {{
 function drawStartScreen() {{
     drawRoad();
     drawTraffic();
-    aiCars.forEach((car) => drawCar(car, car.name));
     drawCar(player, "YOU");
     drawHUD();
-    drawCenteredMessage("READY TO RACE", "Click Start Game to begin", "#1d4ed8", "#0f172a");
+    drawCenteredMessage("READY TO DRIVE", "Click Start Game to begin", "#1d4ed8", "#0f172a");
 }}
 
 function drawPausedScreen() {{
     drawRoad();
     drawTraffic();
-    aiCars.forEach((car) => drawCar(car, car.name));
     drawCar(player, "YOU");
     drawHUD();
     drawCenteredMessage("GAME STOPPED", "Click Start Game to play again", "#7c2d12", "#111827");
@@ -607,24 +636,17 @@ function drawPausedScreen() {{
 function drawGameOverScreen() {{
     drawRoad();
     drawTraffic();
-    aiCars.forEach((car) => drawCar(car, car.name));
     drawCar(player, "YOU");
     drawHUD();
-    drawCenteredMessage("GAME OVER", "Your car crashed into another car", "#991b1b", "#111827");
+    drawCenteredMessage("GAME OVER", "Your car crashed into traffic", "#991b1b", "#111827");
 }}
 
 function drawWinScreen() {{
     drawRoad();
     drawTraffic();
-    aiCars.forEach((car) => drawCar(car, car.name));
     drawCar(player, "YOU");
     drawHUD();
-
-    if (playerWon) {{
-        drawCenteredMessage("YOU WIN", "You finished the race in 1st place", "#166534", "#0f172a");
-    }} else {{
-        drawCenteredMessage("RACE FINISHED", "You completed the race", "#1e40af", "#111827");
-    }}
+    drawCenteredMessage("YOU WIN", "You completed all laps successfully", "#166534", "#0f172a");
 }}
 
 function gameLoop() {{
@@ -644,15 +666,12 @@ function gameLoop() {{
 
     if (!gameOver) {{
         updatePlayer();
-        updateAI();
         updateTraffic();
         checkCollisions();
-        updatePlayerRank();
     }}
 
     drawRoad();
     drawTraffic();
-    aiCars.forEach((car) => drawCar(car, car.name));
     drawCar(player, "YOU");
     drawHUD();
 
@@ -677,7 +696,7 @@ components.html(game_html, height=710)
 
 st.markdown("""
 <div class="status-box">
-    <b>Note:</b> If you press <b>Stop Game</b>, the current race stops. 
-    Press <b>Start Game</b> again to launch a fresh run, or use <b>Restart Game</b> to reload the race instantly.
+    <b>Note:</b> This version includes <b>car selection</b>, <b>3 difficulty levels</b>, 
+    and only <b>your car + traffic cars</b>. Different cars have different handling and speed.
 </div>
 """, unsafe_allow_html=True)
